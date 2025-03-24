@@ -28,6 +28,15 @@ parser.add_argument('--debug', action='store_true', help='Debug mode')
 
 args = parser.parse_args()
 
+from requests.adapters import HTTPAdapter
+from requests.packages.urllib3.util.retry import Retry
+
+session = requests.Session()
+retries = Retry(total=5, backoff_factor=1, status_forcelist=[500, 502, 503, 504])
+adapter = HTTPAdapter(max_retries=retries)
+session.mount('https://', adapter)
+
+
 # setup SQL connection
 sqluser, sqlpass = None, None
 if args.dbcreds:
@@ -85,9 +94,17 @@ def epmc_data_links(pubmed_id):
 
 max_retries = 3
 def query_europepmc(endpoint, request_params, retry_count=0):
-    response = requests.get(endpoint, params=request_params)
+    # response = requests.get(endpoint, params=request_params)
+    try:
+        response = session.get(endpoint, params=request_params, timeout=10)
+    except requests.exceptions.RequestException as e:
+        print(f"Error: EuropePMC request failed with error '{e}'")
+
+
     if response.status_code == 200:
         data = response.json()
+    else:
+        raise ConnectionError(f"Error: EuropePMC request failed with status code {response.status_code}")
 
     # Handle malformed/incomplete results - retry up to max_retries times
     if not data.get('hitCount'):
