@@ -2,6 +2,9 @@ process WRITE_TO_GBC {
     label 'process_tiny'
     debug true
 
+    errorStrategy { task.attempt <= 3 ? 'retry' : 'ignore' }
+    maxRetries 3
+
     input:
     tuple path(json_file), path(accession_types), val(db), path(db_creds)
 
