@@ -14,6 +14,8 @@ process DOWNLOAD_TM_FILES {
     outdir = "text_mined_csvs"
     """
     wget -r -l 1 ${wget_options} -nd -e robots=off ${download_url} -P ${outdir}
-    rm ${excluded_types}
+    for et in ${excluded_types}; do
+        rm -f ${outdir}/\$et.csv
+    done
     """
 }

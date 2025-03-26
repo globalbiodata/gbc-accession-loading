@@ -10,26 +10,36 @@ include { WRITE_TO_GBC } from './modules/writeToGBC'
 workflow {
     main:
 
-        download = DOWNLOAD_TM_FILES(params.download_url, params.excluded_files, params.wget_options)
+        download = DOWNLOAD_TM_FILES(params.download_url, params.excluded_types, params.wget_options)
         download.accession_csvs | flatten
         | view
 
         download.accession_csvs
         | flatten
         | map { csv ->
-            meta = ['resource_name': csv.baseName]
+            def meta = ['resource_name': csv.baseName]
             [meta, csv, params.batch_size]
         }
         | GROUP_PMIDS
         | set { grouped_accessions }
 
-        grouped_accessions | flatten
+
+        // take tuple of meta and jsons list, and convert to list of tuples of meta, json, accession_types
+        grouped_accessions
+        | flatMap { meta, jsons ->
+            def json_list = jsons instanceof List ? jsons : [jsons]
+            json_list.collect { json ->
+                [meta + ['resource_chunk':json.baseName], json, file(params.accession_types)]
+            }
+        }
         | view
 
         grouped_accessions
-        | flatten
-        | map { meta, json ->
-            [meta + ['resource_chunk':json.baseName], json, file(params.accession_types)]
+        | flatMap { meta, jsons ->
+            def json_list = jsons instanceof List ? jsons : [jsons]
+            json_list.collect { json ->
+                [meta + ['resource_chunk':json.baseName], json, file(params.accession_types)]
+            }
         }
         | QUERY_EUROPEPMC
         | set { epmc_jsons }

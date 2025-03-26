@@ -15,9 +15,7 @@ parser.add_argument('--accession-types', type=str, help='Path to JSON file with 
 parser.add_argument('--outfile', type=str, help='Output directory for results', required=True)
 args = parser.parse_args()
 
-if not os.path.exists(args.outdir):
-    os.makedirs(args.outdir)
-
+# query EuropePMC for publication metadata
 max_retries = 5
 def query_europepmc(endpoint, request_params, retry_count=0, graceful_exit=False):
     response = requests.get(endpoint, params=request_params)
@@ -65,7 +63,8 @@ for result in epmc_data['resultList']['result']:
     ext_id = result['id']
     formatted_data[ext_id] = {}
     for field in epmc_fields:
-        formatted_data[ext_id][field] = result.get(field)
+        if result.get(field):
+            formatted_data[ext_id][field] = result.get(field)
     formatted_data[ext_id]['accessions'] = input[ext_id]
 
 with open(args.outfile, 'w') as f:

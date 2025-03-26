@@ -7,7 +7,7 @@ process GROUP_PMIDS {
     tuple val(meta), path(csv_file), val(batch_size)
 
     output:
-    tuple(val(meta), path("${outdir}/*.json"))
+    tuple(val(meta), path("${outdir}/**.json"))
 
     script:
     outdir = "${meta.resource_name}_grouped"
