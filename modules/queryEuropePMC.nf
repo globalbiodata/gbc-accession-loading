@@ -3,6 +3,8 @@ process QUERY_EUROPEPMC {
     label 'process_tiny'
     debug true
 
+    container 'europe-west2-docker.pkg.dev/gbc-publication-analysis/gbc-docker/gbc-accessions-nextflow:lite'
+
     input:
     tuple val(meta), path(acc_json), path(accession_types)
 

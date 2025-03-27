@@ -1,0 +1,12 @@
+name: gbc-conda-lite
+channels:
+  - conda-forge
+  - bioconda
+dependencies:
+  - python = 3.9
+  - pip
+  - requests
+  - pandas
+  - pip:
+    - argparse
+

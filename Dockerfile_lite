@@ -1,0 +1,9 @@
+FROM continuumio/miniconda3
+
+ADD environment_lite.yaml /tmp/environment.yaml
+RUN conda env create -f /tmp/environment.yaml
+
+RUN echo "conda activate gbc-conda-lite" >> ~/.bashrc
+ENV PATH=/opt/conda/envs/gbc-conda-lite/bin:$PATH
+
+ENV PYTHONPATH=/opt

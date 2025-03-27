@@ -2,6 +2,8 @@ process DOWNLOAD_TM_FILES {
     label 'process_tiny'
     debug true
 
+    container 'europe-west2-docker.pkg.dev/gbc-publication-analysis/gbc-docker/bash-wget:latest'
+
     input:
     val(download_url)
     val(excluded_types)

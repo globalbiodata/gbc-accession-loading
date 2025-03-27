@@ -3,6 +3,8 @@ process WRITE_TO_GBC {
     label 'process_tiny'
     debug true
 
+    container 'europe-west2-docker.pkg.dev/gbc-publication-analysis/gbc-docker/gbc-accessions-nextflow:v1.1'
+
     input:
     tuple val(meta), path(json_file), path(accession_types), val(db), path(db_creds)
 

@@ -3,6 +3,8 @@ process GROUP_PMIDS {
     label 'process_tiny'
     debug true
 
+    container 'europe-west2-docker.pkg.dev/gbc-publication-analysis/gbc-docker/gbc-accessions-nextflow:lite'
+
     input:
     tuple val(meta), path(csv_file), val(batch_size)
 
