@@ -92,7 +92,6 @@ summary_out = open(args.summary, 'w')
 
 max_time, min_time = 0, 0
 for pub in publications.values():
-    print(pub)
     summary_out.write("---------------------------------------------------------------\n")
     summary_out.write(f"📖 {pub.get('title')} (PMID: {pub.get('pmid', 'NA')})\n")
 
@@ -108,7 +107,6 @@ for pub in publications.values():
         t0 = time.time()
         gbc_pub = gbc.new_publication_from_EuropePMC_result(pub, google_maps_api_key=os.environ.get('GOOGLE_MAPS_API_KEY'))
         t1 = time.time()
-        print(gbc_pub)
         gbc_pub.write(engine=cloud_engine, debug=args.debug)
         summary_out.write("    ✅ New publication written to database\n")
     else:
