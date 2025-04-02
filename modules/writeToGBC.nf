@@ -6,7 +6,7 @@ process WRITE_TO_GBC {
     container 'europe-west2-docker.pkg.dev/gbc-publication-analysis/gbc-docker/gbc-accessions-nextflow:v1.1'
 
     input:
-    tuple val(meta), path(json_file), path(accession_types), val(db), path(db_creds)
+    tuple val(meta), path(json_file), path(accession_types), val(db), path(db_creds), path(prediction_metadata)
 
     output:
     path(summary_file)
@@ -15,6 +15,6 @@ process WRITE_TO_GBC {
     summary_file = "${json_file.baseName}.summary.txt"
     """
     load_to_gbc.py --json ${json_file} --accession-types ${accession_types} --resource ${meta.resource_name} \
-    --summary ${summary_file} --db ${db} --dbcreds ${db_creds}
+    --summary ${summary_file} --db ${db} --dbcreds ${db_creds} --prediction ${prediction_metadata}
     """
 }

@@ -15,6 +15,7 @@ import sqlalchemy as db
 parser = argparse.ArgumentParser(description='Load data to GBC')
 parser.add_argument('--json', type=str, help='Path to JSON file with data', required=True)
 parser.add_argument('--accession-types', type=str, help='Path to JSON file with accession types', required=True)
+parser.add_argument('--prediction', type=str, help='Path to JSON file with prediction data (name, date, user)', required=True)
 parser.add_argument('--resource', type=str, help='Resource name', required=True)
 parser.add_argument('--summary', type=str, help='Path for summary file output', required=True)
 
@@ -78,11 +79,12 @@ def get_gbc_resource(dbname):
 # import dictionary of indexed accessions, mapped to GBC database resources
 accession_types = json.load(open(args.accession_types, 'r'))
 
-prediction = gbc.Prediction({
-    'name': 'EuropePMC text-mined accession loading',
-    'date': '2025-03-24',
-    'user': 'carlac'
-})
+# prediction = gbc.Prediction({
+#     'name': 'EuropePMC text-mined accession loading',
+#     'date': '2025-03-24',
+#     'user': 'carlac'
+# })
+prediction = gbc.Prediction(json.load(open(args.prediction, 'r')))
 prediction.write(engine=cloud_engine, debug=args.debug)
 
 gbc_db = get_gbc_resource(args.resource)

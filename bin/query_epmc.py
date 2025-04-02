@@ -12,7 +12,7 @@ parser.add_argument('--infile', type=str, help='JSON file of text mined accessio
 parser.add_argument('--resource', type=str, help='Resource name', required=True)
 parser.add_argument('--accession-types', type=str, help='Path to JSON file with accession types', required=True)
 parser.add_argument('--outfile', type=str, help='Output directory for results', required=True)
-parser.add_argument('--query-batch-size', type=int, default=250, hidden=True)
+parser.add_argument('--query-batch-size', type=int, default=250, help=argparse.SUPPRESS)
 args = parser.parse_args()
 
 # query EuropePMC for publication metadata
