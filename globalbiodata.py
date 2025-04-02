@@ -719,7 +719,7 @@ def select_from_table(table_name, data={}, conn=None, engine=None, debug=False):
 
     wheres = []
     for c in data.keys():
-        if type(data[c]) == list:
+        if type(data[c]) is list:
             wheres.append(table.columns.get(c).in_(data[c]))
         else:
             wheres.append(table.columns.get(c) == data[c])
@@ -771,7 +771,7 @@ def fetch_url(query, expanded=True, conn=None, engine=None, debug=False):
     for u in url_raw:
         if expanded:
             u['status'] = fetch_connection_status({'url_id':u['id']}, conn=conn, engine=engine, debug=debug)
-            u['status'] = [u['status']] if (u['status'] is not None and type(u['status']) != list) else u['status']
+            u['status'] = [u['status']] if (u['status'] is not None and type(u['status']) is not list) else u['status']
         urls.append(URL(u))
 
     return urls if len(urls) > 1 else urls[0]
@@ -857,7 +857,7 @@ def fetch_all_grant_agencies(conn=None, engine=None, debug=False):
 def new_publication_from_EuropePMC_result(epmc_result, google_maps_api_key=None):
     affiliations, countries = _extract_affiliations(epmc_result, google_maps_api_key=google_maps_api_key)
     new_publication = Publication({
-        'publication_title': epmc_result.get('title', ''), 'pubmed_id': epmc_result.get('pmid', ''), 'pmc_id': epmc_result.get('pmcid', ''),
+        'publication_title': epmc_result.get('title', ''), 'pubmed_id': epmc_result.get('pmid', None), 'pmc_id': epmc_result.get('pmcid', ''),
         'publication_date': epmc_result.get('journalInfo', {}).get('printPublicationDate'), 'grants': _extract_grants(epmc_result),
         'keywords': '; '.join(_extract_keywords(epmc_result)), 'citation_count': epmc_result.get('citedByCount', 0),
         'authors': epmc_result.get('authorString', ''), 'affiliation': affiliations, 'affiliation_countries': countries
@@ -910,6 +910,12 @@ def _extract_affiliations(metadata, google_maps_api_key=None):
     # extract author affiliations & countries
     affiliations, countries = [], []
     affiliation_dict, countries_dict = {}, {}
+    custom_country_mappings = {
+        "People's Republic of China": "China", "Macao": "China",
+        "United States of America": "United States", 'Russian Federation': 'Russia',
+        'Kingdom of Saudi Arabia': 'Saudi Arabia', 'Republic of Singapore': 'Singapore'
+    }
+
     try:
         author_list = metadata['authorList']['author']
         for author in author_list:
@@ -918,9 +924,9 @@ def _extract_affiliations(metadata, google_maps_api_key=None):
                 clean_a = _clean_affilation(a['affiliation'])
                 affiliation_dict[clean_a] = 1
                 a_countries = _find_country(clean_a, google_maps_api_key=google_maps_api_key)
-                countries_dict.update({x:1 for x in a_countries[0]})
+                countries_dict.update({(custom_country_mappings.get(x) or x):1 for x in a_countries[0]})
         affiliations = list(affiliation_dict.keys())
-        countries = list(countries_dict.keys())
+        countries = sorted(list(countries_dict.keys()))
     except KeyError:
         pass
 

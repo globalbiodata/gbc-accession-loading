@@ -1,6 +1,5 @@
 #!/usr/bin/env python3
 import sys
-import os
 import json
 
 import requests
@@ -13,6 +12,7 @@ parser.add_argument('--infile', type=str, help='JSON file of text mined accessio
 parser.add_argument('--resource', type=str, help='Resource name', required=True)
 parser.add_argument('--accession-types', type=str, help='Path to JSON file with accession types', required=True)
 parser.add_argument('--outfile', type=str, help='Output directory for results', required=True)
+parser.add_argument('--query-batch-size', type=int, default=250, hidden=True)
 args = parser.parse_args()
 
 # query EuropePMC for publication metadata
@@ -52,20 +52,27 @@ epmc_base_url = "https://www.ebi.ac.uk/europepmc/webservices/rest"
 
 # read input file
 input = json.load(open(args.infile, 'r'))
-query = " OR ".join([f"EXT_ID:{ext_id}" for ext_id in input.keys()])
 
-search_params = {'query': query, 'resultType': 'core', 'format': 'json'}
-
-epmc_data = query_europepmc(f"{epmc_base_url}/search", search_params)
+# make queries in batches of 250 IDs
+input_ids = list(input.keys())
 formatted_data = {}
 
-for result in epmc_data['resultList']['result']:
-    ext_id = result['id']
-    formatted_data[ext_id] = {}
-    for field in epmc_fields:
-        if result.get(field):
-            formatted_data[ext_id][field] = result.get(field)
-    formatted_data[ext_id]['accessions'] = input[ext_id]
+while input_ids:
+    batch = input_ids[:args.query_batch_size]
+    input_ids = input_ids[args.query_batch_size:]
+
+    # create query string for batch and search
+    query = " OR ".join([f"EXT_ID:{ext_id}" for ext_id in batch])
+    search_params = {'query': query, 'resultType': 'core', 'format': 'json'}
+    epmc_data = query_europepmc(f"{epmc_base_url}/search", search_params)
+
+    for result in epmc_data['resultList']['result']:
+        ext_id = result['id']
+        formatted_data[ext_id] = {}
+        for field in epmc_fields:
+            if result.get(field):
+                formatted_data[ext_id][field] = result.get(field)
+        formatted_data[ext_id]['accessions'] = input[ext_id]
 
 with open(args.outfile, 'w') as f:
     json.dump(formatted_data, f, indent=4)

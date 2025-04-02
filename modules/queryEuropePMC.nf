@@ -2,6 +2,7 @@ process QUERY_EUROPEPMC {
     tag "${meta.resource_chunk}"
     label 'process_tiny'
     debug true
+    maxForks 3 // Limit the number of concurrent processes to 3 to avoid hitting rate limit
 
     container 'europe-west2-docker.pkg.dev/gbc-publication-analysis/gbc-docker/gbc-accessions-nextflow:lite'
 
