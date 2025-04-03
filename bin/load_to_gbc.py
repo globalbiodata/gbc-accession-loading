@@ -91,17 +91,18 @@ gbc_db = get_gbc_resource(args.resource)
 
 publications = json.load(open(args.json, 'r'))
 summary_out = open(args.summary, 'w')
+accessions_loaded = 0
 
 max_time, min_time = 0, 0
 for pub in publications.values():
     summary_out.write("---------------------------------------------------------------\n")
     summary_out.write(f"📖 {pub.get('title')} (PMID: {pub.get('pmid', 'NA')})\n")
 
-
+    gbc_pub = None
     t0 = time.time()
     if pub.get('pmid'):
         gbc_pub = gbc.fetch_publication({'pubmed_id': pub.get('pmid')}, engine=cloud_engine, debug=args.debug, expanded=False)
-    else:
+    elif pub.get('pmcid'):
         gbc_pub = gbc.fetch_publication({'pmc_id': pub.get('pmcid')}, engine=cloud_engine, debug=args.debug, expanded=False)
     t1 = time.time()
 
@@ -112,7 +113,7 @@ for pub in publications.values():
         gbc_pub.write(engine=cloud_engine, debug=args.debug)
         summary_out.write("    ✅ New publication written to database\n")
     else:
-        summary_out.write("    🔍 Publication already exists in database\n")
+        summary_out.write(f"    🔍 Publication already exists in database (p.id: {gbc_pub.id})\n")
 
     t2 = time.time()
 
@@ -127,6 +128,7 @@ for pub in publications.values():
         gbc_acc.write(engine=cloud_engine, debug=args.debug)
 
     summary_out.write(f"🔗 New {args.resource} data links:{len(pub.get('accessions'))}\n")
+    accessions_loaded += len(pub.get('accessions'))
 
     t4 = time.time()
     this_time = t4-t0
@@ -135,7 +137,8 @@ for pub in publications.values():
 
 summary_out.write("\n")
 summary_out.write("📊 Summary of data loading:\n")
-summary_out.write(f"📈 Total number of publications loaded: {len(publications)}\n")
+summary_out.write(f"📖 Total number of publications loaded: {len(publications)}\n")
+summary_out.write(f"🔗 Total number of accessions loaded: {accessions_loaded}\n")
 summary_out.write(f"🕓 Maximum time taken for a publication: {round(max_time, 3)}s\n")
 summary_out.write(f"🕓 Minimum time taken for a publication: {round(min_time, 3)}s\n")
 summary_out.close()

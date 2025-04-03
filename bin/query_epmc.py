@@ -63,6 +63,7 @@ while input_ids:
 
     # create query string for batch and search
     query = " OR ".join([f"EXT_ID:{ext_id}" for ext_id in batch])
+    query = f"({query}) AND (SRC:MED OR SRC:PMC)"
     search_params = {'query': query, 'resultType': 'core', 'format': 'json'}
     epmc_data = query_europepmc(f"{epmc_base_url}/search", search_params)
 
