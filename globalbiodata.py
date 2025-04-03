@@ -858,9 +858,10 @@ def new_publication_from_EuropePMC_result(epmc_result, google_maps_api_key=None)
     affiliations, countries = _extract_affiliations(epmc_result, google_maps_api_key=google_maps_api_key)
     new_publication = Publication({
         'publication_title': epmc_result.get('title', ''), 'pubmed_id': epmc_result.get('pmid', None), 'pmc_id': epmc_result.get('pmcid', ''),
-        'publication_date': epmc_result.get('journalInfo', {}).get('printPublicationDate'), 'grants': _extract_grants(epmc_result),
-        'keywords': '; '.join(_extract_keywords(epmc_result)), 'citation_count': epmc_result.get('citedByCount', 0),
-        'authors': epmc_result.get('authorString', ''), 'affiliation': affiliations, 'affiliation_countries': countries
+        'publication_date': epmc_result.get('journalInfo', {}).get('printPublicationDate') or epmc_result.get('firstPublicationDate'),
+        'grants': _extract_grants(epmc_result),'keywords': '; '.join(_extract_keywords(epmc_result)),
+        'citation_count': epmc_result.get('citedByCount', 0), 'authors': epmc_result.get('authorString', ''), 'affiliation': affiliations,
+        'affiliation_countries': countries
     })
     return new_publication
 
@@ -934,6 +935,8 @@ def _extract_affiliations(metadata, google_maps_api_key=None):
 
 def _find_country(s, google_maps_api_key=None):
     # print(f"Searching for countries in '{s}'")
+    if not s:
+        return ([], '')
 
     # location search
     place_entity = locationtagger.find_locations(text = s)

@@ -1,10 +1,10 @@
 FROM continuumio/miniconda3
 
-ADD environment.yaml /tmp/environment.yaml
+ADD environment_full.yaml /tmp/environment.yaml
 RUN conda env create -f /tmp/environment.yaml
 
-RUN echo "conda activate gbc-conda" >> ~/.bashrc
-ENV PATH=/opt/conda/envs/gbc-conda/bin:$PATH
+RUN echo "conda activate gbc-conda-full" >> ~/.bashrc
+ENV PATH=/opt/conda/envs/gbc-conda-full/bin:$PATH
 
 # download python module extra requirements
 RUN python -m spacy download en_core_web_sm
