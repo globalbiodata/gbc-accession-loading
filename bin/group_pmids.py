@@ -31,7 +31,7 @@ df = df[df['source'].isin(['MED', 'PMC'])]
 grouped = df.groupby('ext_id')['accession'].apply(list).reset_index()
 result = grouped.set_index('ext_id').to_dict()['accession']
 
-summary_out = open(f"{args.prefix}.summary.tsv", 'w')
+summary_out = open(f"{args.outdir}/{args.prefix}.summary.tsv", 'w')
 summary_out.write("batch\tpub_count\tacc_count\n")
 for i in range(0, len(result), args.batch_size):
     batch = dict(list(result.items())[i:i + args.batch_size])
