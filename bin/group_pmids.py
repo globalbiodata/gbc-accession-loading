@@ -31,8 +31,13 @@ df = df[df['source'].isin(['MED', 'PMC'])]
 grouped = df.groupby('ext_id')['accession'].apply(list).reset_index()
 result = grouped.set_index('ext_id').to_dict()['accession']
 
+summary_out = open(f"{args.prefix}.summary.tsv", 'w')
+summary_out.write("batch\tpub_count\tacc_count\n")
 for i in range(0, len(result), args.batch_size):
     batch = dict(list(result.items())[i:i + args.batch_size])
     batch_file = hashed_json_filename((i // args.batch_size) + 1)
     with open(batch_file, 'w') as f:
         json.dump(batch, f, indent=4)
+
+    summary_out.write(f"{os.path.basename(batch_file)}\t{len(batch)}\t{sum(len(v) for v in batch.values())}\n")
+summary_out.close()
