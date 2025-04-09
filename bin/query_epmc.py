@@ -12,7 +12,7 @@ parser.add_argument('--infile', type=str, help='JSON file of text mined accessio
 parser.add_argument('--resource', type=str, help='Resource name', required=True)
 parser.add_argument('--accession-types', type=str, help='Path to JSON file with accession types', required=True)
 parser.add_argument('--outfile', type=str, help='Output directory for results', required=True)
-parser.add_argument('--query-batch-size', type=int, default=250, help=argparse.SUPPRESS)
+parser.add_argument('--query-batch-size', type=int, default=250, help=argparse.SUPPRESS) # exposed for testing purposes only - do not change
 args = parser.parse_args()
 
 # query EuropePMC for publication metadata
@@ -42,6 +42,15 @@ def query_europepmc(endpoint, request_params, retry_count=0, graceful_exit=False
 
     return data
 
+def query_article_endpoint(id):
+    source = 'PMC' if id.startswith('PMC') else 'MED'
+    articles_endpoint = f"{epmc_base_url}/article/{source}/{id}"
+    article_params = {'format': 'json', 'resultType': 'core'}
+    article_data = query_europepmc(articles_endpoint, article_params)
+
+    return article_data.get('result', {})
+
+
 # manually create dictionary of indexed accessions, mapped to GBC database resources
 accession_types = json.load(open(args.accession_types, 'r'))
 epmc_fields = [
@@ -52,28 +61,54 @@ epmc_base_url = "https://www.ebi.ac.uk/europepmc/webservices/rest"
 
 # read input file
 input = json.load(open(args.infile, 'r'))
-
-# make queries in batches of 250 IDs
 input_ids = list(input.keys())
 formatted_data = {}
 
+# make queries in batches of 250 IDs
 while input_ids:
     batch = input_ids[:args.query_batch_size]
     input_ids = input_ids[args.query_batch_size:]
 
-    # create query string for batch and search
-    query = " OR ".join([f"EXT_ID:{ext_id}" for ext_id in batch])
+    # create query string for batch and ping search endpoint
+    query = " OR ".join([f"PMCID:{ext_id}" if ext_id.startswith("PMC") else f"EXT_ID:{ext_id}" for ext_id in batch])
     query = f"({query}) AND (SRC:MED OR SRC:PMC)"
-    search_params = {'query': query, 'resultType': 'core', 'format': 'json'}
+    search_params = {'query': query, 'resultType': 'core', 'format': 'json', 'pageSize': args.query_batch_size}
     epmc_data = query_europepmc(f"{epmc_base_url}/search", search_params)
 
+    # first, process search results
     for result in epmc_data['resultList']['result']:
         ext_id = result['id']
         formatted_data[ext_id] = {}
-        for field in epmc_fields:
-            if result.get(field):
-                formatted_data[ext_id][field] = result.get(field)
-        formatted_data[ext_id]['accessions'] = input[ext_id]
+        formatted_data[ext_id].update({field: result[field] for field in epmc_fields if field in result})
+        formatted_data[ext_id]['accessions'] = input.get(ext_id) or input.get(result.get('pmcid'))
+
+        # track which ids were successfully queried
+        try:
+            if ext_id in batch:
+                batch.remove(ext_id)
+            elif result.get('pmcid') in batch:
+                batch.remove(result.get('pmcid'))
+        except ValueError:
+            pass
+
+    # if there are any ids left in the batch, query the article endpoint
+    # (I think there's a lag in indexing, as there is a mismatch between the search and article endpoints)
+    # this is a workaround to get the missing data
+    if len(batch) > 0:
+        for ext_id in batch[:]:
+            article_result = query_article_endpoint(ext_id)
+            formatted_data[ext_id] = {}
+            formatted_data[ext_id].update({field: article_result[field] for field in epmc_fields if field in article_result})
+            formatted_data[ext_id]['accessions'] = input[ext_id]
+
+            # track which ids were successfully queried
+            try:
+                if ext_id in batch:
+                    batch.remove(ext_id)
+                elif article_result.get('pmcid') in batch:
+                    batch.remove(article_result.get('pmcid'))
+            except ValueError:
+                pass
 
 with open(args.outfile, 'w') as f:
     json.dump(formatted_data, f, indent=4)
