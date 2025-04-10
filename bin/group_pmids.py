@@ -39,10 +39,10 @@ for i in range(0, len(result), args.batch_size):
     with open(batch_file, 'w') as f:
         json.dump(batch, f, indent=4)
 
-    summary_out.write("\t".join(
+    summary_out.write("\t".join([
         f"{os.path.basename(batch_file)}",
-        len(batch),
-        len(set(acc for acc_list in batch.values() for acc in acc_list)),
-        sum(len(v) for v in batch.values()))
-    + "\n")
+        f"{len(batch)}",
+        f"{len(set(acc for acc_list in batch.values() for acc in acc_list))}",
+        f"{sum(len(v) for v in batch.values())}"
+    ]) + "\n")
 summary_out.close()
