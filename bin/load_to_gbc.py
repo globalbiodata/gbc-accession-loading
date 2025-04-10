@@ -106,7 +106,7 @@ for pub in publications.values():
         gbc_pub = gbc.fetch_publication({'pmc_id': pub.get('pmcid')}, engine=cloud_engine, debug=args.debug, expanded=False)
     t1 = time.time()
 
-    if not gbc_pub:
+    if not gbc_pub or type(gbc_pub) is not gbc.Publication:
         t0 = time.time()
         gbc_pub = gbc.new_publication_from_EuropePMC_result(pub, google_maps_api_key=os.environ.get('GOOGLE_MAPS_API_KEY'))
         t1 = time.time()
