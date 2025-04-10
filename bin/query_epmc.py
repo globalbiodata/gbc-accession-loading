@@ -6,6 +6,9 @@ import requests
 import time
 import random
 
+from requests.adapters import HTTPAdapter
+from urllib3.util.retry import Retry
+
 import argparse
 parser = argparse.ArgumentParser(description='Query EuropePMC for publication metadata.')
 parser.add_argument('--infile', type=str, help='JSON file of text mined accessions', required=True)
@@ -15,10 +18,25 @@ parser.add_argument('--outfile', type=str, help='Output directory for results', 
 parser.add_argument('--query-batch-size', type=int, default=250, help=argparse.SUPPRESS) # exposed for testing purposes only - do not change
 args = parser.parse_args()
 
+# setup retry strategy and HTTP adapter to handle rate limiting
+# and transient errors
+retry_strategy = Retry(
+    total=5,                      # Try up to 5 times
+    backoff_factor=1.5,           # Starts with 1.5s → 3s → 6s → 12s → 24s
+    status_forcelist=[429, 500, 502, 503, 504],
+    allowed_methods=["HEAD", "GET", "OPTIONS"],
+    raise_on_status=False
+)
+
+adapter = HTTPAdapter(max_retries=retry_strategy)
+session = requests.Session()
+session.mount("https://", adapter)
+session.mount("http://", adapter)
+
 # query EuropePMC for publication metadata
 max_retries = 5
 def query_europepmc(endpoint, request_params, retry_count=0, graceful_exit=False, no_exit=False):
-    response = requests.get(endpoint, params=request_params)
+    response = session.get(endpoint, params=request_params, timeout=15)
     if response.status_code == 200:
         data = response.json()
     else:
