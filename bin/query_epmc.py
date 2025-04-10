@@ -22,22 +22,27 @@ def query_europepmc(endpoint, request_params, retry_count=0, graceful_exit=False
     if response.status_code == 200:
         data = response.json()
     else:
-        sys.stderr.write(f"Error: {response.status_code} - {response.text}\n")
+        sys.stderr.write(f"Error: bad code: {response.status_code} - {response.text}\n")
+        if no_exit:
+            return {}
         sys.exit(1)
 
     # Handle malformed/incomplete results - retry up to max_retries times
-    if not data.get('hitCount'):
-        sys.stderr.write(f"Error: No data found for {endpoint} / {request_params}. Retrying...\n")
+    if data.get('hitCount', None) is None:
+        sys.stderr.write(f"Error: incomplete data returned for {endpoint} / {request_params}. Retrying...\n")
         if retry_count < max_retries:
             time.sleep(random.randint(1, 30))
             return query_europepmc(endpoint, request_params, retry_count=retry_count+1)
         else:
-            sys.stderr.write(f"Error: malformed data returned for {endpoint} / {request_params} after {max_retries} retries\n")
-            return {} if no_exit else (sys.exit(0) if graceful_exit else sys.exit(1))
+            sys.stderr.write(f"Error: incomplete data returned for {endpoint} / {request_params} after {max_retries} retries\n")
+            if no_exit:
+                return {}
+            else:
+                sys.exit(0) if graceful_exit else sys.exit(1)
 
     # Handle empty results
     if data['hitCount'] == 0:
-        sys.stderr.write(f"Error: No data found for {request_params}\n")
+        sys.stderr.write(f"Error: No results found for {endpoint} / {request_params}\n")
         return {}
 
     return data
