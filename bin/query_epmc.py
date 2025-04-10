@@ -119,6 +119,8 @@ while input_ids:
     if len(batch) > 0:
         for ext_id in batch[:]:
             article_result = query_article_endpoint(ext_id)
+            if not article_result:
+                continue
             formatted_data[ext_id] = {}
             formatted_data[ext_id].update({field: article_result[field] for field in epmc_fields if field in article_result})
             formatted_data[ext_id]['accessions'] = input[ext_id]

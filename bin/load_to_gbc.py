@@ -95,6 +95,9 @@ accessions_loaded = 0
 
 max_time, min_time = 0, 0
 for pub in publications.values():
+    if not pub.get('title'):
+        continue
+
     summary_out.write("---------------------------------------------------------------\n")
     summary_out.write(f"📖 {pub.get('title')} (PMID: {pub.get('pmid', 'NA')})\n")
 
