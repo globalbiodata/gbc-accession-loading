@@ -17,7 +17,7 @@ args = parser.parse_args()
 
 # query EuropePMC for publication metadata
 max_retries = 5
-def query_europepmc(endpoint, request_params, retry_count=0, graceful_exit=False):
+def query_europepmc(endpoint, request_params, retry_count=0, graceful_exit=False, no_exit=False):
     response = requests.get(endpoint, params=request_params)
     if response.status_code == 200:
         data = response.json()
@@ -29,11 +29,11 @@ def query_europepmc(endpoint, request_params, retry_count=0, graceful_exit=False
     if not data.get('hitCount'):
         sys.stderr.write(f"Error: No data found for {endpoint} / {request_params}. Retrying...\n")
         if retry_count < max_retries:
-            time.sleep(random.randint(1, 15))
+            time.sleep(random.randint(1, 30))
             return query_europepmc(endpoint, request_params, retry_count=retry_count+1)
         else:
-            sys.stderr.write(f"Error: No data found for {endpoint} / {request_params} after {max_retries} retries\n")
-            sys.exit(0) if graceful_exit else sys.exit(1)
+            sys.stderr.write(f"Error: malformed data returned for {endpoint} / {request_params} after {max_retries} retries\n")
+            return {} if no_exit else (sys.exit(0) if graceful_exit else sys.exit(1))
 
     # Handle empty results
     if data['hitCount'] == 0:
@@ -46,8 +46,7 @@ def query_article_endpoint(id):
     source = 'PMC' if id.startswith('PMC') else 'MED'
     articles_endpoint = f"{epmc_base_url}/article/{source}/{id}"
     article_params = {'format': 'json', 'resultType': 'core'}
-    article_data = query_europepmc(articles_endpoint, article_params)
-
+    article_data = query_europepmc(articles_endpoint, article_params, no_exit=True)
     return article_data.get('result', {})
 
 
