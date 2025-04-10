@@ -106,7 +106,7 @@ for pub in publications.values():
         gbc_pub = gbc.fetch_publication({'pmc_id': pub.get('pmcid')}, engine=cloud_engine, debug=args.debug, expanded=False)
     t1 = time.time()
 
-    if not gbc_pub or type(gbc_pub) is not gbc.Publication:
+    if not gbc_pub or type(gbc_pub) is not gbc.Publication or not gbc_pub.title:
         t0 = time.time()
         gbc_pub = gbc.new_publication_from_EuropePMC_result(pub, google_maps_api_key=os.environ.get('GOOGLE_MAPS_API_KEY'))
         t1 = time.time()
@@ -116,6 +116,10 @@ for pub in publications.values():
         summary_out.write(f"    🔍 Publication already exists in database (p.id: {gbc_pub.id})\n")
 
     t2 = time.time()
+
+    if not gbc_pub.title:
+        summary_out.write("    ❌ No title found for publication\n")
+        continue
 
     summary_out.write(f"1. Creation of gbc.Publication object: {round(t1-t0, 3)}s\n")
     summary_out.write(f"2. Writing publication to database: {round(t2-t1, 3)}s\n")
