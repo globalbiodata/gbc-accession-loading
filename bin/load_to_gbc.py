@@ -15,7 +15,7 @@ import sqlalchemy as db
 parser = argparse.ArgumentParser(description='Load data to GBC')
 parser.add_argument('--json', type=str, help='Path to JSON file with data', required=True)
 parser.add_argument('--accession-types', type=str, help='Path to JSON file with accession types', required=True)
-parser.add_argument('--prediction', type=str, help='Path to JSON file with prediction data (name, date, user)', required=True)
+parser.add_argument('--version', type=str, help='Path to JSON file with version metadata (name, date, user)', required=True)
 parser.add_argument('--resource', type=str, help='Resource name', required=True)
 parser.add_argument('--summary', type=str, help='Path for summary file output', required=True)
 

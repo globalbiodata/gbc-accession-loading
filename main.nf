@@ -49,7 +49,7 @@ workflow {
 
         epmc_jsons
         | map { meta, json ->
-            [meta, json, file(params.accession_types), params.db, file(params.db_creds), file(params.prediction_metadata)]
+            [meta, json, file(params.accession_types), params.db, file(params.db_creds), file(params.version_json)]
         }
         | WRITE_TO_GBC
 }
