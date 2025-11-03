@@ -1,20 +1,21 @@
 process QUERY_EUROPEPMC {
+    tag "${meta.resource_chunk}"
     label 'process_tiny'
     debug true
+    maxForks 3 // Limit the number of concurrent processes to 3 to avoid hitting rate limit
+
+    container 'europe-west2-docker.pkg.dev/gbc-publication-analysis/gbc-docker/gbc-accessions-nextflow:lite'
 
     input:
-    path(accession_types)
-    val page_size
-    val limit
-    val db
-    path(db_creds)
+    tuple val(meta), path(acc_json), path(accession_types)
 
     output:
-    path("epmc_jsons/**.json"), emit: epmc_jsons
+    tuple(val(meta), path(outfile))
 
     script:
+    outfile = "${acc_json.baseName}.epmc.json"
     """
-    query_epmc.py --accession-types ${accession_types} --outdir epmc_jsons/ \
-    --page-size ${page_size} --limit ${limit} --db ${db} --dbcreds ${db_creds}
+    query_epmc.py --infile ${acc_json} --outfile ${outfile} \
+    --resource ${meta.resource_name} --accession-types ${accession_types}
     """
 }

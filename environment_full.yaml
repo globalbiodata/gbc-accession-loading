@@ -1,4 +1,4 @@
-name: gbc-conda
+name: gbc-conda-full
 channels:
   - conda-forge
   - bioconda

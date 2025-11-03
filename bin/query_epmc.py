@@ -1,139 +1,138 @@
 #!/usr/bin/env python3
 import sys
-import os
+import json
 
 import requests
-import json
 import time
 import random
+
+from requests.adapters import HTTPAdapter
+from urllib3.util.retry import Retry
+
 import argparse
-
-from google.cloud.sql.connector import Connector
-import pymysql
-import sqlalchemy as db
-
-parser = argparse.ArgumentParser(description='Query EuropePMC for accession data.')
-# parser.add_argument('--cursor-file', type=str, help='File to read/write cursor mark', required=True)
+parser = argparse.ArgumentParser(description='Query EuropePMC for publication metadata.')
+parser.add_argument('--infile', type=str, help='JSON file of text mined accessions', required=True)
+parser.add_argument('--resource', type=str, help='Resource name', required=True)
 parser.add_argument('--accession-types', type=str, help='Path to JSON file with accession types', required=True)
-parser.add_argument('--outdir', type=str, help='Output directory for results', required=True)
-
-parser.add_argument('--db', type=str, help='Database to use (format: instance_name/db_name)', required=True)
-parser.add_argument('--dbcreds', type=str, help='Path to JSON file with SQL credentials')
-parser.add_argument('--sqluser', type=str, help='SQL user', default=os.environ.get("CLOUD_SQL_USER"))
-parser.add_argument('--sqlpass', type=str, help='SQL password', default=os.environ.get("CLOUD_SQL_PASSWORD"))
-
-parser.add_argument('--page-size', type=int, default=1000, help='Number of results per page')
-parser.add_argument('--limit', type=int, default=0, help='Limit the number of results')
-
+parser.add_argument('--outfile', type=str, help='Output directory for results', required=True)
+parser.add_argument('--query-batch-size', type=int, default=250, help=argparse.SUPPRESS) # exposed for testing purposes only - do not change
 args = parser.parse_args()
-limit = args.limit if args.limit > 0 else None
 
-if not os.path.exists(args.outdir):
-    os.makedirs(args.outdir)
+# setup retry strategy and HTTP adapter to handle rate limiting
+# and transient errors
+retry_strategy = Retry(
+    total=5,                      # Try up to 5 times
+    backoff_factor=1.5,           # Starts with 1.5s → 3s → 6s → 12s → 24s
+    status_forcelist=[429, 500, 502, 503, 504],
+    allowed_methods=["HEAD", "GET", "OPTIONS"],
+    raise_on_status=False
+)
 
-# setup SQL connection
-sqluser, sqlpass = None, None
-if args.dbcreds:
-    creds = json.load(open(args.dbcreds, 'r'))
-    sqluser, sqlpass = creds.get('user'), creds.get('pass')
-elif args.sqluser and args.sqlpass:
-    sqluser, sqlpass = args.sqluser, args.sqlpass
-else:
-    sys.exit("Error: No SQL credentials provided")
+adapter = HTTPAdapter(max_retries=retry_strategy)
+session = requests.Session()
+session.mount("https://", adapter)
+session.mount("http://", adapter)
 
-gcp_connector = Connector()
-instance, db_name = args.db.split('/')
-def getcloudconn() -> pymysql.connections.Connection:
-    conn: pymysql.connections.Connection = gcp_connector.connect(
-        instance, "pymysql",
-        user=sqluser,
-        password=sqlpass,
-        db=db_name
-    )
-    return conn
-
-cloud_engine = db.create_engine("mysql+pymysql://", creator=getcloudconn, pool_recycle=60 * 5, pool_pre_ping=True)
-cloud_conn = cloud_engine.connect()
-
-max_retries = 10
-def query_europepmc(endpoint, request_params, retry_count=0, graceful_exit=False):
-    response = requests.get(endpoint, params=request_params)
+# query EuropePMC for publication metadata
+max_retries = 5
+def query_europepmc(endpoint, request_params, retry_count=0, graceful_exit=False, no_exit=False):
+    response = session.get(endpoint, params=request_params, timeout=15)
     if response.status_code == 200:
         data = response.json()
+    else:
+        sys.stderr.write(f"Error: bad code: {response.status_code} - {response.text}\n")
+        if no_exit:
+            return {}
+        sys.exit(1)
 
     # Handle malformed/incomplete results - retry up to max_retries times
-    if not data.get('hitCount'):
-        sys.stderr.write(f"Error: No data found for {endpoint} / {request_params}. Retrying...\n")
+    if data.get('hitCount', None) is None:
+        sys.stderr.write(f"Error: incomplete data returned for {endpoint} / {request_params}. Retrying...\n")
         if retry_count < max_retries:
-            time.sleep(random.randint(1, 15))
+            time.sleep(random.randint(1, 30))
             return query_europepmc(endpoint, request_params, retry_count=retry_count+1)
         else:
-            sys.stderr.write(f"Error: No data found for {endpoint} / {request_params} after {max_retries} retries\n")
-            sys.exit(0) if graceful_exit else sys.exit(1)
+            sys.stderr.write(f"Error: incomplete data returned for {endpoint} / {request_params} after {max_retries} retries\n")
+            if no_exit:
+                return {}
+            else:
+                sys.exit(0) if graceful_exit else sys.exit(1)
 
     # Handle empty results
     if data['hitCount'] == 0:
-        sys.stderr.write(f"Error: No data found for {request_params}\n")
+        sys.stderr.write(f"Error: No results found for {endpoint} / {request_params}\n")
         return {}
 
     return data
 
-# hash directory for results files (to avoid overpopulating a single directory)
-def generate_json_file(c):
-    cstr = str(c).zfill(7)
-    hashdir = '/'.join(list(cstr)[::-1][:4])
-    outdir = f"{args.outdir}/{hashdir}"
-    if not os.path.exists(outdir):
-        os.makedirs(outdir)
-    return f"{outdir}/results.{cstr}.json"
+def query_article_endpoint(id):
+    source = 'PMC' if id.startswith('PMC') else 'MED'
+    articles_endpoint = f"{epmc_base_url}/article/{source}/{id}"
+    article_params = {'format': 'json', 'resultType': 'core'}
+    article_data = query_europepmc(articles_endpoint, article_params, no_exit=True)
+    return article_data.get('result', {})
+
 
 # manually create dictionary of indexed accessions, mapped to GBC database resources
 accession_types = json.load(open(args.accession_types, 'r'))
-acc_query = "(%s)" % ' OR '.join([f"ACCESSION_TYPE:{at}" for at in accession_types])
 epmc_fields = [
     'pmid', 'pmcid', 'title', 'authorList', 'authorString', 'journalInfo', 'grantsList',
     'keywordList', 'meshHeadingList', 'citedByCount', 'hasTMAccessionNumbers'
 ]
-
-db_cursors = cloud_conn.execute(db.text("SELECT cursor_mark, cursor_id FROM tmp_cursor_tracking ORDER BY time DESC LIMIT 1")).fetchone()
-if db_cursors:
-    cursor, c = db_cursors
-    c = int(c)
-else:
-    cursor, c = None, 1
-
 epmc_base_url = "https://www.ebi.ac.uk/europepmc/webservices/rest"
-more_data = True
-while more_data:
-    search_params = {
-        'query': acc_query, 'resultType': 'core',
-        'format': 'json', 'pageSize': args.page_size,
-        'cursorMark': cursor
-    }
 
-    # if error, exit gracefully : this allows us to resume from where we left off in the
-    # event of an error (using the last cursor mark in the database)
-    data = query_europepmc(f"{epmc_base_url}/search", search_params, graceful_exit=True)
+# read input file
+input = json.load(open(args.infile, 'r'))
+input_ids = list(input.keys())
+formatted_data = {}
 
-    limit = limit or data.get('hitCount')
-    if cursor is None:
-        print(f"--- Expecting {limit} of {data.get('hitCount')} results!")
+# make queries in batches of 250 IDs
+while input_ids:
+    batch = input_ids[:args.query_batch_size]
+    input_ids = input_ids[args.query_batch_size:]
 
-    formatted_results = {'cursor': cursor, 'results': []}
-    for result in data['resultList']['result']:
-        formatted_results['results'].append({k: result[k] for k in epmc_fields if k in result})
+    # create query string for batch and ping search endpoint
+    query = " OR ".join([f"PMCID:{ext_id}" if ext_id.startswith("PMC") else f"EXT_ID:{ext_id}" for ext_id in batch])
+    query = f"({query}) AND (SRC:MED OR SRC:PMC)"
+    search_params = {'query': query, 'resultType': 'core', 'format': 'json', 'pageSize': args.query_batch_size}
+    epmc_data = query_europepmc(f"{epmc_base_url}/search", search_params)
 
-    with(open(generate_json_file(c), 'w')) as f:
-        json.dump(formatted_results, f, indent=4)
-        print(f"---- Wrote {args.page_size} results to file {f.name} (cursor: {cursor})")
+    # first, process search results
+    for result in epmc_data['resultList']['result']:
+        ext_id = result['id']
+        formatted_data[ext_id] = {}
+        formatted_data[ext_id].update({field: result[field] for field in epmc_fields if field in result})
+        formatted_data[ext_id]['accessions'] = input.get(ext_id) or input.get(result.get('pmcid'))
 
-    c += 1
-    limit -= args.page_size
-    print(f"----- Remaining results: {limit}")
+        # track which ids were successfully queried
+        try:
+            if ext_id in batch:
+                batch.remove(ext_id)
+            elif result.get('pmcid') in batch:
+                batch.remove(result.get('pmcid'))
+        except ValueError:
+            pass
 
-    cursor = data.get('nextCursorMark')
-    if not cursor or limit <= 0:
-        more_data = False
-    else:
-        cloud_conn.execute(db.text(f"INSERT INTO tmp_cursor_tracking (cursor_mark, cursor_id) VALUES ('{cursor}', {c})"))
-        cloud_conn.commit()
+    # if there are any ids left in the batch, query the article endpoint
+    # (I think there's a lag in indexing, as there is a mismatch between the search and article endpoints)
+    # this is a workaround to get the missing data
+    if len(batch) > 0:
+        for ext_id in batch[:]:
+            article_result = query_article_endpoint(ext_id)
+            if not article_result:
+                continue
+            formatted_data[ext_id] = {}
+            formatted_data[ext_id].update({field: article_result[field] for field in epmc_fields if field in article_result})
+            formatted_data[ext_id]['accessions'] = input[ext_id]
+
+            # track which ids were successfully queried
+            try:
+                if ext_id in batch:
+                    batch.remove(ext_id)
+                elif article_result.get('pmcid') in batch:
+                    batch.remove(article_result.get('pmcid'))
+            except ValueError:
+                pass
+
+with open(args.outfile, 'w') as f:
+    json.dump(formatted_data, f, indent=4)
