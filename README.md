@@ -21,7 +21,7 @@ It identifies publications containing accession-based citations to biodata resou
 The workflow runs in three main stages:
 
 1. **Download Europe PMC text-mined dataset**
-   Bulk downloads pre-computed files from Europe PMC’s FTP service.
+   Bulk downloads pre-computed files from [Europe PMC’s FTP service](https://europepmc.org/ftp/TextMinedTerms).
    These files link accession identifiers to publications across 48 key biodata resources.
 
 2. **Europe PMC query for metadata**
